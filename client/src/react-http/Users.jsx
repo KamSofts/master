@@ -9,14 +9,18 @@ const Users = () => {
     const refMail = useRef();
     const refWebsite = useRef();
 
+    function sbClear() {
+        refName.current.value = "";
+        refMail.current.value = "";
+        refWebsite.current.value = "";
+        refName.current.focus();
+    }
+
     const cmdClear_Click = (e) => {
         e.preventDefault();
         setEmsg("");
         try {
-            refName.current.value = "";
-            refMail.current.value = "";
-            refWebsite.current.value = "";
-            refName.current.focus();
+            sbClear();
         } catch (error) {
             setEmsg(error.message);
         }
@@ -35,16 +39,28 @@ const Users = () => {
                 return;
             }
 
-            /* TODO...
             fetch("http://localhost:5000/users", {
                 method: "POST",
                 body: JSON.stringify({ name, email, website }),
                 headers: {
                     "Content-Type": "application/json; charset=UTF-8"
                 }
-            }).then((res) => console.log(res));
-            */
-
+            }).then((res) => {
+                // 1. Check if the server response status is ok (200-299)
+                if (!res.ok) {
+                    throw new Error(`Server error: ${res.status}`);
+                }
+                return res.json(); // 2. Convert the stream to a readable JSON object
+            }).then((serverData) => {
+                // 3. This will now log: { message: "User created successfully!", data: {...} }
+                console.log("Response from server:", serverData);
+                console.log("The actual user object:", serverData.data);
+                sbClear();
+                setData((prev) => [serverData.data, ...prev]);
+            }).catch((err) => {
+                console.error("Fetch request failed:", err);
+                setEmsg(err.message);
+            });
         } catch (error) {
             setEmsg(error.message);
         }
