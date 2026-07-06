@@ -1,12 +1,23 @@
 const http = require("http");
-const users = require("../data/users.json");
+const fs = require("fs");
+const path = require("path");
 
-let id = 11;
+// JSON data file
+const dataPath = path.join(__dirname, "../data/users.json");
+
+// Helper function to read the local JSON database file safely
+function readUsers() {
+    try {
+        return JSON.parse(fs.readFileSync(dataPath, "utf8"));
+    } catch {
+        return [];
+    }
+}
 
 const server = http.createServer((req, res) => {
     // 1. Set global CORS headers for all incoming requests
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
     // 2. Handle the browser's preflight OPTIONS request
@@ -16,7 +27,17 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    if (req.url === "/users") {
+    // 3. Simple manual router for checking dynamic URLs (e.g., /users/1)
+    const isExactUsersRoute = req.url === "/users";
+    const isIdUsersRoute = req.url.startsWith("/users/");
+
+    // Extract ID string if the URL format matches /users/something
+    const userId = isIdUsersRoute ? Number(req.url.split("/")[2]) : null;
+
+    // --- ROUTE: BASE /users ---
+    if (isExactUsersRoute) {
+        let users = readUsers();
+
         switch (req.method) {
             case "GET":
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -25,25 +46,19 @@ const server = http.createServer((req, res) => {
 
             case "POST":
                 let body = "";
-
-                // Listen for incoming data stream chunks from fetch
-                req.on("data", (chunk) => {
-                    body += chunk.toString();
-                });
-
-                // Once all data chunks have arrived
+                req.on("data", chunk => body += chunk.toString());
                 req.on("end", () => {
                     try {
-                        const parsedData = JSON.parse(body);
-                        console.log("Received Data :", parsedData);
-                        const userObj = {id, ...parsedData};
-                        console.log("Sending Data :", userObj);
+                        const newUser = JSON.parse(body);
+                        newUser.id = Date.now(); // Generate unique id and added to newUser object
+
+                        users.push(newUser);
+                        fs.writeFileSync(dataPath, JSON.stringify(users, null, 2));
 
                         // Always send a response back to resolve the fetch .then
                         res.writeHead(201, { 'content-type': 'application/json' });
-                        res.end(JSON.stringify({ message: "User created", data: userObj }));
-                        id++;
-                    } catch (error) {
+                        res.end(JSON.stringify({ message: "User created", data: users }));
+                    } catch {
                         res.writeHead(400, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ message: "Invalid JSON format" }));
                     }
@@ -51,14 +66,53 @@ const server = http.createServer((req, res) => {
                 break;
 
             default:
-                res.writeHead(405, { 'Content-Type': 'text/plain' });
-                res.end("Method Not Allowed");
+                res.writeHead(405).end();
                 break;
         }
+    }
+    // --- ROUTE: DYNAMIC /users/:id ---
+    else if (isIdUsersRoute && userId) {
+        let users = readUsers();
+        const userIndex = users.findIndex(u => u.id === userId);
+
+        // Check if the requested user even exists first
+        if (userIndex < 0) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ message: "User not found" }));
+            return;
+        }
+
+        switch (req.method) {
+            case "PUT":
+                let body = "";
+                req.on("data", chunk => body += chunk.toString());
+                req.on("end", () => {
+                    try {
+                        const updatedUser = JSON.parse(body);
+                        users[userIndex] = {
+                            ...users[userIndex],
+                            ...updatedUser,
+                            id: users[userIndex].id
+                        };
+                        fs.writeFileSync(dataPath, JSON.stringify(users, null, 2));
+
+                        res.writeHead(200, { "Content-Type": "application/json" });
+                        res.end(JSON.stringify({ message: "User updated", data: users }));
+                    } catch (err) {
+                        console.log(err)
+                        res.writeHead(400, { "Content-Type": "text/plain" });
+                        res.end("Invalid JSON Body");
+                    }
+                });
+                break;
+
+            default:
+                res.writeHead(405).end();
+                break;
+        }
+
     } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.write("Not Found");
-        res.end();
+        res.writeHead(405).end();
     }
 });
 

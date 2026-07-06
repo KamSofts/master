@@ -3,13 +3,17 @@ import "./Users.css";
 
 const Users = () => {
 
+    const base_url = "http://localhost:5000/users";
+
     const [data, setData] = useState([]);
     const [emsg, setEmsg] = useState("");
+    const [editId, setEditId] = useState(0);
     const refName = useRef();
     const refMail = useRef();
     const refWebsite = useRef();
 
     function sbClear() {
+        setEditId(0);
         refName.current.value = "";
         refMail.current.value = "";
         refWebsite.current.value = "";
@@ -39,8 +43,11 @@ const Users = () => {
                 return;
             }
 
-            fetch("http://localhost:5000/users", {
-                method: "POST",
+
+            const u = editId <= 0 ? base_url : `${base_url}/${editId}`;
+            const m = editId <= 0 ? "POST" : "PUT";
+            fetch(u, {
+                method: m,
                 body: JSON.stringify({ name, email, website }),
                 headers: {
                     "Content-Type": "application/json; charset=UTF-8"
@@ -52,13 +59,12 @@ const Users = () => {
                 }
                 return res.json(); // 2. Convert the stream to a readable JSON object
             }).then((serverData) => {
-                // 3. This will now log: { message: "User created successfully!", data: {...} }
-                console.log("Response from server:", serverData);
-                console.log("The actual user object:", serverData.data);
+                // 3. This will now log: { message: "User created", data:[{...},{...}] }
+                // console.log("Response from server:", serverData);
+                // console.log("The actual user object:", serverData.data);
                 sbClear();
-                setData((prev) => [serverData.data, ...prev]);
+                setData(serverData.data);
             }).catch((err) => {
-                console.error("Fetch request failed:", err);
                 setEmsg(err.message);
             });
         } catch (error) {
@@ -66,8 +72,17 @@ const Users = () => {
         }
     }
 
+    const cmdEdit_Click = (user) => {
+        setEmsg("");
+        setEditId(user.id);
+        refName.current.value = user.name;
+        refMail.current.value = user.email;
+        refWebsite.current.value = user.website;
+        refName.current.focus();
+    }
+
     useEffect(() => {
-        fetch("http://localhost:5000/users")
+        fetch(base_url)
             .then((res) => res.json())
             .then((json) => setData(json));
     }, []);
@@ -110,7 +125,7 @@ const Users = () => {
                             <td>{user.name}</td>
                             <td>{user.email}</td>
                             <td>{user.website}</td>
-                            <td><button>...</button></td>
+                            <td><button onClick={() => cmdEdit_Click(user)}>...</button></td>
                         </tr>
                     )}
                 </tbody>
