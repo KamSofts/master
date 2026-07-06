@@ -106,6 +106,13 @@ const server = http.createServer((req, res) => {
                 });
                 break;
 
+            case "DELETE":
+                users.splice(userIndex, 1);
+                fs.writeFileSync(dataPath, JSON.stringify(users, null, 2));
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ message: "User deleted", data: users }));
+                break;
+
             default:
                 res.writeHead(405).end();
                 break;

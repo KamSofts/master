@@ -30,7 +30,7 @@ const Users = () => {
         }
     }
 
-    const cmdSave_Click = (e) => {
+    const cmdSave_Click = (e, isDelete) => {
         e.preventDefault();
         setEmsg("");
         try {
@@ -43,9 +43,9 @@ const Users = () => {
                 return;
             }
 
-
+            if (isDelete && editId <= 0) return; // avoid POST method request
             const u = editId <= 0 ? base_url : `${base_url}/${editId}`;
-            const m = editId <= 0 ? "POST" : "PUT";
+            const m = editId <= 0 ? "POST" : (isDelete ? "DELETE" : "PUT");
             fetch(u, {
                 method: m,
                 body: JSON.stringify({ name, email, website }),
@@ -103,8 +103,9 @@ const Users = () => {
                 <label htmlFor="txtWebsite">Website : </label>
                 <input type="text" name="txtWebsite" id="txtWebsite" ref={refWebsite} />
             </div>
-            <button onClick={cmdSave_Click} >Save</button>
+            <button onClick={(e) => cmdSave_Click(e, false)} >Save</button>
             <button onClick={cmdClear_Click}>Clear</button>
+            <button onClick={(e) => cmdSave_Click(e, true)}>Delete</button>
         </div>
 
         <div>
